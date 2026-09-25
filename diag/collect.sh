@@ -83,9 +83,10 @@ for n in d.get("Nodes") or []:
     if n.get("Files"): n["Files"]={k:"<redacted>" for k in n["Files"]}
 print(json.dumps(d,indent=2))' 2>&1
 done
-sec "other buildx state on disk"
-$SUDO find / -xdev \( -path /proc -o -path /sys -o -path /var/lib/docker -o -path /var/lib/containerd \) -prune -o \
-  \( -path '*/buildx/current' -o -path '*/buildx/instances/*' -o -name 'buildkitd.toml' \) -print 2>/dev/null | head -40
+sec "other buildx state on disk (bounded)"
+$SUDO timeout 60 find /root /home /etc /opt /run /var/run /usr/local -maxdepth 5 \
+  \( -path '*/buildx/current' -o -path '*/buildx/instances/*' -o -name 'buildkitd.toml' -o -iname '*nsc*' -o -iname '*namespace*' \) \
+  -not -path '*/hostedtoolcache/*' -print 2>/dev/null | head -60
 
 sec "Namespace host configuration"
 for b in nsc nsc-bazel docker-credential-nsc buildctl buildkitd; do printf '%s: ' "$b"; command -v "$b" || echo missing; done
@@ -105,9 +106,11 @@ ps -eo user,pid,args --no-headers 2>/dev/null | grep -iE 'buildkit|nsc|namespace
 sec sockets
 $SUDO ss -xlpn 2>/dev/null | grep -iE 'buildkit|docker|nsc|namespace|containerd' | head -30
 $SUDO ss -ltnp 2>/dev/null | head -30
-sec "files mentioning in-runner-builder under /etc /opt /usr/local"
-$SUDO grep -rIl --exclude-dir=proc 'in-runner-builder' /etc /opt /usr/local/bin /usr/local/lib /var/lib/cloud 2>/dev/null | head -20
-for f in $($SUDO grep -rIl 'in-runner-builder' /etc /opt /usr/local/bin 2>/dev/null | head -5); do
+sec "files mentioning in-runner-builder (bounded: /etc, /usr/local/bin, /opt depth 3, /var/lib/cloud)"
+files=$( { $SUDO timeout 60 grep -rIl 'in-runner-builder' /etc /usr/local/bin /var/lib/cloud 2>/dev/null
+          $SUDO timeout 60 find /opt -maxdepth 3 -type f -size -2M -not -path '*/hostedtoolcache/*' -exec grep -Il 'in-runner-builder' {} + 2>/dev/null; } | head -20)
+echo "$files"
+for f in $(echo "$files" | head -5); do
   echo "--- $f"; $SUDO sed -E 's/-----BEGIN.*/<redacted>/' "$f" | head -80
 done
 exit 0

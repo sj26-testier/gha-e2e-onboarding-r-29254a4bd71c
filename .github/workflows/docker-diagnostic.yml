@@ -103,6 +103,9 @@ jobs:
           bash diag/mark.sh start post-setup
           docker build -t probe:post-setup . 2>&1 | grep -E '^#0|WARNING|naming to|importing|sending tarball' || true
           bash diag/mark.sh check post-setup probe:post-setup n/a
+          bash diag/mark.sh start post-setup-bx
+          docker buildx build -t probe:post-setup-bx . 2>&1 | grep -E '^#0|WARNING|naming to|importing|sending tarball' || true
+          bash diag/mark.sh check post-setup-bx probe:post-setup-bx n/a
       - run: bash diag/mark.sh start bpa-setup
       - name: build-push-action (default inputs) after setup-buildx
         id: bpa
