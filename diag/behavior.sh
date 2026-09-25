@@ -65,6 +65,9 @@ if [ "$mode" = extended ]; then
   docker run -d --name diag-registry -p 5000:5000 registry:2 >/dev/null 2>&1 && sleep 2
   probe push "localhost:5000/probe:push-$label" docker buildx build --push -t "localhost:5000/probe:push-$label" .
   echo "registry tags: $(curl -s localhost:5000/v2/probe/tags/list 2>&1)"
+  ttl="ttl.sh/bk-gha-diag-$(cat /proc/sys/kernel/random/uuid):1h"
+  probe push-ttl "$ttl" docker buildx build --push -t "$ttl" .
+  echo "ttl push: pushed-image-loaded-locally=$(docker image inspect "$ttl" >/dev/null 2>&1 && echo yes || echo no)"
   probe multi-platform "probe:multi-$label" docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.multi -t "probe:multi-$label" .
   probe multi-platform-load "probe:multiload-$label" docker buildx build --load --platform linux/amd64,linux/arm64 -f Dockerfile.multi -t "probe:multiload-$label" .
   probe output-docker-explicit "probe:odock-$label" docker buildx build --output type=docker -t "probe:odock-$label" .

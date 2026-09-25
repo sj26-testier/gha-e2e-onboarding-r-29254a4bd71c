@@ -127,3 +127,12 @@ jobs:
       - name: Run build-push-action load image
         if: always()
         run: bash diag/mark.sh check bpa-setup-load probe:bpa-setup-load "${{ steps.bpaload.outcome }}"
+
+  alias-off:
+    name: Remove builder alias (plain docker build routing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove aliases.builder and build
+        run: bash diag/alias-off.sh alias-off

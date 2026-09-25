@@ -95,6 +95,11 @@ ls -la /opt 2>&1
 ls -la /etc/buildkit /etc/namespace /etc/nsc /var/run/nsc /run/nsc /opt/namespace 2>&1
 $SUDO sh -c 'cat /etc/buildkit/buildkitd.toml 2>/dev/null'
 $SUDO sh -c 'cat /etc/docker/daemon.json 2>/dev/null'; echo
+sec "Namespace runtime files (listing only; no secret contents)"
+ls -laR /run/nsc-buildkit /home/runner/.config/ns 2>&1 | head -40
+ls -la /home/runner/nsc.Runner.Worker /var/run/secrets/guest 2>&1 | head
+file /home/runner/nsc.Runner.Worker 2>/dev/null
+python3 -c 'import json;d=json.load(open("/run/nsc/metadata.json"));print("metadata.json keys:",sorted(d))' 2>&1
 sec "systemd units"
 systemctl list-units --all --no-pager --no-legend 2>/dev/null | grep -iE 'nsc|namespace|buildkit|docker|containerd|builder' 
 for u in $(systemctl list-units --all --no-pager --no-legend --plain 2>/dev/null | awk '{print $1}' | grep -iE 'nsc|namespace|buildkit|builder'); do
@@ -102,7 +107,8 @@ for u in $(systemctl list-units --all --no-pager --no-legend --plain 2>/dev/null
 done
 ls /etc/systemd/system 2>&1 | head -80
 sec processes
-ps -eo user,pid,args --no-headers 2>/dev/null | grep -iE 'buildkit|nsc|namespace|containerd|dockerd|proxy' | grep -v grep | cut -c1-400
+ps -eo user,pid,args --no-headers 2>/dev/null | grep -iE 'buildkit|nsc|namespace|containerd|dockerd|proxy' | grep -v grep \
+  | sed -E 's/(--token[= ])[^ ]+/\1<redacted>/g; s/(bk[a-z]{2,4}_)[A-Za-z0-9._-]+/\1<redacted>/g' | cut -c1-300
 sec sockets
 $SUDO ss -xlpn 2>/dev/null | grep -iE 'buildkit|docker|nsc|namespace|containerd' | head -30
 $SUDO ss -ltnp 2>/dev/null | head -30
