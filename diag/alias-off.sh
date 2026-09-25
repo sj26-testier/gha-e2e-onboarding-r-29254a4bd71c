@@ -15,7 +15,7 @@ print('aliases after:', d.get('aliases'))
 PY
 for c in "docker build" "docker buildx build"; do
   tag="probe:$label-$(echo $c | tr ' ' '-')"
-  bash "$(dirname "$0")/mark.sh" start "$label"
+  bash "$(dirname "$0")/mark.sh" start "$label[$c]"
   $c -t "$tag" . 2>&1 | grep -E '^#0|WARNING' || true
   bash "$(dirname "$0")/mark.sh" check "$label[$c]" "$tag" n/a
 done
