@@ -1,0 +1,126 @@
+name: Docker builder diagnostic
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Baseline (current builder)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect host state
+        run: bash diag/collect.sh baseline full
+      - name: Behavior probes
+        run: bash diag/behavior.sh baseline extended
+      - run: bash diag/mark.sh start bpa-baseline
+      - name: build-push-action (default inputs)
+        id: bpa
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          tags: probe:bpa-baseline
+      - name: Run build-push-action image
+        if: always()
+        run: bash diag/mark.sh check bpa-baseline probe:bpa-baseline "${{ steps.bpa.outcome }}"
+
+  fix:
+    name: Candidate fix (default-load=true in place)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Behavior before fix
+        run: bash diag/behavior.sh before basic
+      - name: Apply default-load in place
+        run: python3 diag/fix.py
+      - name: Collect state after fix
+        run: bash diag/collect.sh after-fix short
+      - name: Behavior after fix
+        run: bash diag/behavior.sh after extended
+      - run: bash diag/mark.sh start bpa-fix
+      - name: build-push-action (default inputs) after fix
+        id: bpa
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          tags: probe:bpa-fix
+      - name: Run build-push-action image
+        if: always()
+        run: bash diag/mark.sh check bpa-fix probe:bpa-fix "${{ steps.bpa.outcome }}"
+      - name: Collect state at end of job (persistence)
+        if: always()
+        run: bash diag/collect.sh end-of-fix-job short
+
+  default-builder:
+    name: BUILDX_BUILDER=default comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUILDX_BUILDER: default
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect state
+        run: bash diag/collect.sh default-builder short
+      - name: Behavior with default builder
+        run: bash diag/behavior.sh default-builder basic
+      - run: bash diag/mark.sh start bpa-default
+      - name: build-push-action (default inputs)
+        id: bpa
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          tags: probe:bpa-default
+      - name: Run build-push-action image
+        if: always()
+        run: bash diag/mark.sh check bpa-default probe:bpa-default "${{ steps.bpa.outcome }}"
+
+  setup-buildx:
+    name: Fix then docker/setup-buildx-action
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply default-load in place
+        run: python3 diag/fix.py
+      - name: Plain build after fix
+        run: |
+          bash diag/mark.sh start pre-setup
+          docker build -t probe:pre-setup . 2>&1 | grep -E '^#0|WARNING|naming to|importing' || true
+          bash diag/mark.sh check pre-setup probe:pre-setup n/a
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Collect state after setup-buildx-action
+        run: bash diag/collect.sh after-setup-buildx short
+      - name: Plain build after setup-buildx-action
+        run: |
+          bash diag/mark.sh start post-setup
+          docker build -t probe:post-setup . 2>&1 | grep -E '^#0|WARNING|naming to|importing|sending tarball' || true
+          bash diag/mark.sh check post-setup probe:post-setup n/a
+      - run: bash diag/mark.sh start bpa-setup
+      - name: build-push-action (default inputs) after setup-buildx
+        id: bpa
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          tags: probe:bpa-setup
+      - name: Run build-push-action image
+        if: always()
+        run: bash diag/mark.sh check bpa-setup probe:bpa-setup "${{ steps.bpa.outcome }}"
+      - run: bash diag/mark.sh start bpa-setup-load
+      - name: build-push-action load=true after setup-buildx
+        id: bpaload
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          load: true
+          tags: probe:bpa-setup-load
+      - name: Run build-push-action load image
+        if: always()
+        run: bash diag/mark.sh check bpa-setup-load probe:bpa-setup-load "${{ steps.bpaload.outcome }}"

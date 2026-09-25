@@ -1,2 +1,4 @@
-# gha-e2e-onboarding-r-29254a4bd71c
-Amp lab onboarding: r-29254a4bd71c
+# Docker builder diagnostics
+
+Amp lab fixture comparing Docker/Buildx behavior on GitHub-hosted `ubuntu-latest`
+and buildkite-gha native Namespace hosts. See `.github/workflows/docker-diagnostic.yml`.

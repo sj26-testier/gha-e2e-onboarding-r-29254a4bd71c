@@ -1,0 +1,3 @@
+FROM alpine:3.20
+COPY probe-static.txt /probe.txt
+CMD ["cat", "/probe.txt"]

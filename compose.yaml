@@ -1,0 +1,4 @@
+services:
+  probe:
+    build: .
+    image: probe:compose
